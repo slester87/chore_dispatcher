@@ -35,7 +35,9 @@ class ChoreRepository:
             'name': chore.name,
             'description': chore.description,
             'status': chore.status.value,
-            'next_chore_id': chore.next_chore.id if chore.next_chore else None
+            'next_chore_id': chore.next_chore.id if chore.next_chore else None,
+            'progress_info': chore.progress_info,
+            'review_info': chore.review_info
         }
     
     def _dict_to_chore(self, data: dict) -> Chore:
@@ -46,6 +48,8 @@ class ChoreRepository:
         chore.description = data['description']
         chore.status = ChoreStatus(data['status'])
         chore.next_chore = None  # Will be linked after all chores loaded
+        chore.progress_info = data.get('progress_info')
+        chore.review_info = data.get('review_info')
         return chore
     
     def create(self, name: str, description: str = "") -> Chore:
@@ -60,7 +64,8 @@ class ChoreRepository:
         return self._chores.get(chore_id)
     
     def update(self, chore_id: int, name: str = None, description: str = None, 
-               status: ChoreStatus = None) -> Optional[Chore]:
+               status: ChoreStatus = None, progress_info: str = None, 
+               review_info: str = None) -> Optional[Chore]:
         """Update a chore's properties."""
         chore = self._chores.get(chore_id)
         if not chore:
@@ -72,6 +77,10 @@ class ChoreRepository:
             chore.description = description
         if status is not None:
             chore.status = status
+        if progress_info is not None:
+            chore.progress_info = progress_info
+        if review_info is not None:
+            chore.review_info = review_info
         
         self._save_to_file()
         return chore

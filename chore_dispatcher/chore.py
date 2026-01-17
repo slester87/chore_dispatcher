@@ -24,6 +24,8 @@ class Chore:
         self.description = description
         self.status = ChoreStatus.DESIGN
         self.next_chore: Optional['Chore'] = None
+        self.progress_info: Optional[str] = None
+        self.review_info: Optional[str] = None
     
     def set_next_chore(self, chore: 'Chore') -> None:
         self.next_chore = chore

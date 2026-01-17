@@ -7,6 +7,7 @@ from chore import Chore, ChoreStatus
 class ChoreRepository:
     def __init__(self, storage_file: str = "chores.jsonl"):
         self.storage_file = storage_file
+        self.completed_file = storage_file.replace('.jsonl', '_completed.jsonl') if storage_file.endswith('.jsonl') else storage_file + '_completed'
         self._chores: Dict[int, Chore] = {}
         self._load_from_file()
     
@@ -27,6 +28,11 @@ class ChoreRepository:
         with open(self.storage_file, 'w') as f:
             for chore in self._chores.values():
                 f.write(json.dumps(self._chore_to_dict(chore)) + '\n')
+    
+    def _archive_completed_chore(self, chore: Chore):
+        """Move completed chore to historical archive."""
+        with open(self.completed_file, 'a') as f:
+            f.write(json.dumps(self._chore_to_dict(chore)) + '\n')
     
     def _chore_to_dict(self, chore: Chore) -> dict:
         """Convert chore to dictionary."""
@@ -71,6 +77,8 @@ class ChoreRepository:
         if not chore:
             return None
         
+        old_status = chore.status
+        
         if name is not None:
             chore.name = name
         if description is not None:
@@ -81,6 +89,11 @@ class ChoreRepository:
             chore.progress_info = progress_info
         if review_info is not None:
             chore.review_info = review_info
+        
+        # If chore became complete, archive it and remove from active
+        if old_status != ChoreStatus.WORK_DONE and chore.status == ChoreStatus.WORK_DONE:
+            self._archive_completed_chore(chore)
+            del self._chores[chore_id]
         
         self._save_to_file()
         return chore

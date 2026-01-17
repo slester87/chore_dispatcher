@@ -6,10 +6,13 @@ from chore_src.snowflake import Snowflake
 class ChoreStatus(Enum):
     DESIGN = "design"
     DESIGN_REVIEW = "design_review"
+    DESIGN_READY = "design_ready"
     PLAN = "plan"
     PLAN_REVIEW = "plan_review"
+    PLAN_READY = "plan_ready"
     WORK = "work"
     WORK_REVIEW = "work_review"
+    WORK_DONE = "work_done"
 
 
 class Chore:
@@ -36,7 +39,7 @@ class Chore:
         return False
     
     def is_complete(self) -> bool:
-        return self.status == ChoreStatus.WORK_REVIEW
+        return self.status == ChoreStatus.WORK_DONE
     
     def get_next_chore(self) -> Optional['Chore']:
         """Returns next chore if this one is complete, None otherwise."""

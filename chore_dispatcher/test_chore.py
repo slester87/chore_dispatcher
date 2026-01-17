@@ -1,4 +1,5 @@
 import unittest
+import os
 from chore import Chore, ChoreStatus
 from chore_repository import ChoreRepository
 
@@ -39,7 +40,12 @@ class TestChore(unittest.TestCase):
 
 class TestChoreRepository(unittest.TestCase):
     def setUp(self):
-        self.repo = ChoreRepository()
+        self.test_file = "test_chores.jsonl"
+        self.repo = ChoreRepository(self.test_file)
+    
+    def tearDown(self):
+        if os.path.exists(self.test_file):
+            os.remove(self.test_file)
     
     def test_create_and_read(self):
         chore = self.repo.create("Test Task", "Description")

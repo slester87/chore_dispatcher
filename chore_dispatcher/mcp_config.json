@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "chore-manager": {
+      "command": "python3",
+      "args": ["/Users/skippo/Development/KIRO/chore_dispatcher/chore_mcp_server.py"],
+      "env": {}
+    }
+  }
+}

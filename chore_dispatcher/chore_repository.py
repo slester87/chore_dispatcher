@@ -1,15 +1,58 @@
 from typing import Dict, List, Optional
+import json
+import os
 from chore import Chore, ChoreStatus
 
 
 class ChoreRepository:
-    def __init__(self):
+    def __init__(self, storage_file: str = "chores.jsonl"):
+        self.storage_file = storage_file
         self._chores: Dict[int, Chore] = {}
+        self._load_from_file()
+    
+    def _load_from_file(self):
+        """Load chores from JSONL file."""
+        if not os.path.exists(self.storage_file):
+            return
+        
+        with open(self.storage_file, 'r') as f:
+            for line in f:
+                if line.strip():
+                    data = json.loads(line)
+                    chore = self._dict_to_chore(data)
+                    self._chores[chore.id] = chore
+    
+    def _save_to_file(self):
+        """Save all chores to JSONL file."""
+        with open(self.storage_file, 'w') as f:
+            for chore in self._chores.values():
+                f.write(json.dumps(self._chore_to_dict(chore)) + '\n')
+    
+    def _chore_to_dict(self, chore: Chore) -> dict:
+        """Convert chore to dictionary."""
+        return {
+            'id': chore.id,
+            'name': chore.name,
+            'description': chore.description,
+            'status': chore.status.value,
+            'next_chore_id': chore.next_chore.id if chore.next_chore else None
+        }
+    
+    def _dict_to_chore(self, data: dict) -> Chore:
+        """Convert dictionary to chore."""
+        chore = Chore.__new__(Chore)  # Create without calling __init__
+        chore.id = data['id']
+        chore.name = data['name']
+        chore.description = data['description']
+        chore.status = ChoreStatus(data['status'])
+        chore.next_chore = None  # Will be linked after all chores loaded
+        return chore
     
     def create(self, name: str, description: str = "") -> Chore:
         """Create a new chore."""
         chore = Chore(name, description)
         self._chores[chore.id] = chore
+        self._save_to_file()
         return chore
     
     def read(self, chore_id: int) -> Optional[Chore]:
@@ -30,12 +73,14 @@ class ChoreRepository:
         if status is not None:
             chore.status = status
         
+        self._save_to_file()
         return chore
     
     def delete(self, chore_id: int) -> bool:
         """Delete a chore by ID."""
         if chore_id in self._chores:
             del self._chores[chore_id]
+            self._save_to_file()
             return True
         return False
     

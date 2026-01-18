@@ -94,7 +94,10 @@ class ChoreRepository:
         if old_status != ChoreStatus.WORK_DONE and chore.status == ChoreStatus.WORK_DONE:
             self._archive_completed_chore(chore)
             del self._chores[chore_id]
+            self._save_to_file()  # Save after removal
+            return chore
         
+        # Save for non-completed chores
         self._save_to_file()
         return chore
     

@@ -56,10 +56,16 @@ class TestChoreRepository(unittest.TestCase):
     
     def test_update(self):
         chore = self.repo.create("Original")
-        updated = self.repo.update(chore.id, name="Updated", status=ChoreStatus.PLAN)
         
+        # Test name update
+        updated = self.repo.update(chore.id, name="Updated")
         self.assertEqual(updated.name, "Updated")
-        self.assertEqual(updated.status, ChoreStatus.PLAN)
+        self.assertEqual(updated.status, ChoreStatus.DESIGN)  # Status unchanged
+        
+        # Test valid status progression using advance_status
+        chore.advance_status()  # design -> design_review
+        updated = self.repo.update(chore.id, status=chore.status)
+        self.assertEqual(updated.status, ChoreStatus.DESIGN_REVIEW)
     
     def test_delete(self):
         chore = self.repo.create("To Delete")
@@ -69,14 +75,22 @@ class TestChoreRepository(unittest.TestCase):
     def test_list_and_filter(self):
         chore1 = self.repo.create("Task 1")
         chore2 = self.repo.create("Task 2")
-        chore2.status = ChoreStatus.WORK
+        
+        # Advance chore2 to work status through valid transitions
+        chore2.advance_status()  # design -> design_review
+        chore2.advance_status()  # design_review -> design_ready
+        chore2.advance_status()  # design_ready -> plan
+        chore2.advance_status()  # plan -> plan_review
+        chore2.advance_status()  # plan_review -> plan_ready
+        chore2.advance_status()  # plan_ready -> work
+        self.repo.update(chore2.id, status=chore2.status)
         
         all_chores = self.repo.list_all()
         self.assertEqual(len(all_chores), 2)
         
         design_chores = self.repo.find_by_status(ChoreStatus.DESIGN)
         self.assertEqual(len(design_chores), 1)
-        self.assertEqual(design_chores[0], chore1)
+        self.assertEqual(design_chores[0].id, chore1.id)
 
 
 if __name__ == '__main__':

@@ -228,6 +228,141 @@ class ArchivalManager:
         return chore
 
 
+class ChainActivationEngine:
+    """Manages chore chain activation and validation"""
+    
+    def __init__(self, active_file: str):
+        self.active_file = active_file
+    
+    def activate_next_chore(self, next_chore_id: int, active_chores: Dict[int, Chore]) -> Optional[Chore]:
+        """Activate next chore in chain when parent completes"""
+        if not next_chore_id:
+            return None
+        
+        next_chore = active_chores.get(next_chore_id)
+        if not next_chore:
+            # Try to load from file if not in memory
+            next_chore = self._load_chore_by_id(next_chore_id)
+            if next_chore:
+                active_chores[next_chore_id] = next_chore
+        
+        if next_chore and next_chore.status == ChoreStatus.DESIGN:
+            # Chain activation - next chore becomes available
+            return next_chore
+        
+        return None
+    
+    def validate_chain_integrity(self, active_chores: Dict[int, Chore]) -> Dict[str, Any]:
+        """Validate chore chain integrity"""
+        issues = []
+        chains = []
+        
+        for chore in active_chores.values():
+            if chore.next_chore:
+                next_id = chore.next_chore.id
+                if next_id not in active_chores:
+                    issues.append(f"Chore {chore.id} references missing next_chore {next_id}")
+                else:
+                    chains.append((chore.id, next_id))
+        
+        # Check for circular chains
+        circular_chains = self._detect_circular_chains(chains)
+        for chain in circular_chains:
+            issues.append(f"Circular chain detected: {' -> '.join(map(str, chain))}")
+        
+        return {
+            'chain_count': len(chains),
+            'circular_chains': len(circular_chains),
+            'issues': issues,
+            'valid': len(issues) == 0
+        }
+    
+    def handle_chain_completion(self, completed_chore: Chore, active_chores: Dict[int, Chore]) -> Dict[str, Any]:
+        """Handle completion of chore with chain"""
+        result = {
+            'next_chore_activated': False,
+            'next_chore_id': None,
+            'activation_details': None
+        }
+        
+        if completed_chore.next_chore:
+            next_chore = self.activate_next_chore(completed_chore.next_chore.id, active_chores)
+            if next_chore:
+                result['next_chore_activated'] = True
+                result['next_chore_id'] = next_chore.id
+                result['activation_details'] = f"Activated chore {next_chore.id}: {next_chore.name}"
+        
+        return result
+    
+    def _load_chore_by_id(self, chore_id: int) -> Optional[Chore]:
+        """Load specific chore from file by ID"""
+        if not os.path.exists(self.active_file):
+            return None
+        
+        with open(self.active_file, 'r') as f:
+            for line in f:
+                if line.strip():
+                    data = json.loads(line)
+                    if data['id'] == chore_id:
+                        return self._dict_to_chore(data)
+        return None
+    
+    def _detect_circular_chains(self, chains: list) -> list:
+        """Detect circular chains in chore relationships"""
+        circular = []
+        
+        # Build adjacency list
+        graph = {}
+        for parent, child in chains:
+            if parent not in graph:
+                graph[parent] = []
+            graph[parent].append(child)
+        
+        # DFS to detect cycles
+        visited = set()
+        rec_stack = set()
+        
+        def has_cycle(node, path):
+            if node in rec_stack:
+                # Found cycle, extract it
+                cycle_start = path.index(node)
+                circular.append(path[cycle_start:] + [node])
+                return True
+            
+            if node in visited:
+                return False
+            
+            visited.add(node)
+            rec_stack.add(node)
+            path.append(node)
+            
+            for neighbor in graph.get(node, []):
+                if has_cycle(neighbor, path):
+                    return True
+            
+            rec_stack.remove(node)
+            path.pop()
+            return False
+        
+        for node in graph:
+            if node not in visited:
+                has_cycle(node, [])
+        
+        return circular
+    
+    def _dict_to_chore(self, data: dict) -> Chore:
+        """Convert dictionary to chore"""
+        chore = Chore.__new__(Chore)
+        chore.id = data['id']
+        chore.name = data['name']
+        chore.description = data['description']
+        chore.status = ChoreStatus(data['status'])
+        chore.next_chore = None  # Will be linked separately
+        chore.progress_info = data.get('progress_info')
+        chore.review_info = data.get('review_info')
+        return chore
+
+
 class ChoreLifecycleManager:
     """Core chore lifecycle management with atomic operations"""
     
@@ -237,6 +372,7 @@ class ChoreLifecycleManager:
         self.transition_engine = StateTransitionEngine()
         self.validator = IntegrityValidator(active_file, completed_file)
         self.archival_manager = ArchivalManager(active_file, completed_file)
+        self.chain_engine = ChainActivationEngine(active_file)
         self._transaction_callbacks: Dict[str, Callable] = {}
     
     @contextmanager
@@ -255,7 +391,7 @@ class ChoreLifecycleManager:
     
     def transition_chore_state(self, chore: Chore, new_status: ChoreStatus, 
                              active_chores: Dict[int, Chore],
-                             progress_info: str = None, review_info: str = None) -> bool:
+                             progress_info: str = None, review_info: str = None) -> Dict[str, Any]:
         """Transition chore to new state with atomic operations"""
         with self.transaction():
             # Execute transition
@@ -267,17 +403,23 @@ class ChoreLifecycleManager:
             if review_info is not None:
                 chore.review_info = review_info
             
+            result = {'success': success, 'chain_activation': None}
+            
             # Handle completion
             if new_status == ChoreStatus.WORK_DONE:
-                self._handle_completion(chore, active_chores)
+                chain_result = self._handle_completion(chore, active_chores)
+                result['chain_activation'] = chain_result
             else:
                 # Save active chores for non-completion transitions
                 self.archival_manager.save_active_chores(active_chores)
             
-            return success
+            return result
     
-    def _handle_completion(self, chore: Chore, active_chores: Dict[int, Chore]):
-        """Handle chore completion - archive and remove from active"""
+    def _handle_completion(self, chore: Chore, active_chores: Dict[int, Chore]) -> Dict[str, Any]:
+        """Handle chore completion - archive, remove from active, and activate chain"""
+        # Handle chain activation before archival
+        chain_result = self.chain_engine.handle_chain_completion(chore, active_chores)
+        
         # Archive completed chore
         self.archival_manager.archive_completed_chore(chore)
         
@@ -287,7 +429,11 @@ class ChoreLifecycleManager:
         # Save updated active chores
         self.archival_manager.save_active_chores(active_chores)
         
-        # Chain activation will be implemented in Phase 3
+        return chain_result
+    
+    def validate_chain_integrity(self, active_chores: Dict[int, Chore]) -> Dict[str, Any]:
+        """Validate chore chain integrity"""
+        return self.chain_engine.validate_chain_integrity(active_chores)
     
     def cleanup_system(self) -> Dict[str, Any]:
         """Clean up system inconsistencies"""

@@ -2,6 +2,7 @@ from typing import Dict, List, Optional
 import json
 import os
 from chore import Chore, ChoreStatus
+from chore_lifecycle_manager import create_lifecycle_manager
 
 
 class ChoreRepository:
@@ -9,6 +10,7 @@ class ChoreRepository:
         self.storage_file = storage_file
         self.completed_file = storage_file.replace('.jsonl', '_completed.jsonl') if storage_file.endswith('.jsonl') else storage_file + '_completed'
         self._chores: Dict[int, Chore] = {}
+        self.lifecycle_manager = create_lifecycle_manager(storage_file, self.completed_file)
         self._load_from_file()
     
     def _load_from_file(self):
@@ -22,17 +24,25 @@ class ChoreRepository:
                     data = json.loads(line)
                     chore = self._dict_to_chore(data)
                     self._chores[chore.id] = chore
+        
+        # Link chore chains
+        self._link_chore_chains()
+    
+    def _link_chore_chains(self):
+        """Link chores based on next_chore_id references"""
+        for chore in self._chores.values():
+            if hasattr(chore, '_next_chore_id') and chore._next_chore_id:
+                next_chore = self._chores.get(chore._next_chore_id)
+                if next_chore:
+                    chore.next_chore = next_chore
     
     def _save_to_file(self):
-        """Save all chores to JSONL file."""
-        with open(self.storage_file, 'w') as f:
-            for chore in self._chores.values():
-                f.write(json.dumps(self._chore_to_dict(chore)) + '\n')
+        """Save all chores to JSONL file using lifecycle manager."""
+        self.lifecycle_manager.archival_manager.save_active_chores(self._chores)
     
     def _archive_completed_chore(self, chore: Chore):
-        """Move completed chore to historical archive."""
-        with open(self.completed_file, 'a') as f:
-            f.write(json.dumps(self._chore_to_dict(chore)) + '\n')
+        """Archive completed chore using lifecycle manager."""
+        self.lifecycle_manager.archival_manager.archive_completed_chore(chore)
     
     def _chore_to_dict(self, chore: Chore) -> dict:
         """Convert chore to dictionary."""
@@ -56,6 +66,8 @@ class ChoreRepository:
         chore.next_chore = None  # Will be linked after all chores loaded
         chore.progress_info = data.get('progress_info')
         chore.review_info = data.get('review_info')
+        # Store next_chore_id for linking
+        chore._next_chore_id = data.get('next_chore_id')
         return chore
     
     def create(self, name: str, description: str = "") -> Chore:
@@ -72,33 +84,49 @@ class ChoreRepository:
     def update(self, chore_id: int, name: str = None, description: str = None, 
                status: ChoreStatus = None, progress_info: str = None, 
                review_info: str = None) -> Optional[Chore]:
-        """Update a chore's properties."""
+        """Update a chore's properties using lifecycle manager."""
         chore = self._chores.get(chore_id)
         if not chore:
             return None
         
         old_status = chore.status
         
+        # Update properties
         if name is not None:
             chore.name = name
         if description is not None:
             chore.description = description
-        if status is not None:
-            chore.status = status
         if progress_info is not None:
             chore.progress_info = progress_info
         if review_info is not None:
             chore.review_info = review_info
         
-        # If chore became complete, archive it and remove from active
-        if old_status != ChoreStatus.WORK_DONE and chore.status == ChoreStatus.WORK_DONE:
-            self._archive_completed_chore(chore)
-            del self._chores[chore_id]
-            self._save_to_file()  # Save after removal
-            return chore
+        # Handle status transitions through lifecycle manager
+        if status is not None and status != old_status:
+            try:
+                result = self.lifecycle_manager.transition_chore_state(
+                    chore, status, self._chores, progress_info, review_info
+                )
+                
+                # Handle chain activation
+                if result.get('chain_activation', {}).get('next_chore_activated'):
+                    chain_info = result['chain_activation']
+                    print(f"Chain activated: {chain_info['activation_details']}")
+                
+                # If chore was completed and archived, remove from memory
+                if status == ChoreStatus.WORK_DONE and chore_id not in self._chores:
+                    # Chore was archived and removed by lifecycle manager
+                    pass
+                
+            except Exception as e:
+                print(f"Lifecycle transition failed: {e}")
+                # Fallback to old behavior
+                chore.status = status
+                self._save_to_file()
+        else:
+            # No status change, just save
+            self._save_to_file()
         
-        # Save for non-completed chores
-        self._save_to_file()
         return chore
     
     def delete(self, chore_id: int) -> bool:
@@ -116,3 +144,21 @@ class ChoreRepository:
     def find_by_status(self, status: ChoreStatus) -> List[Chore]:
         """Find chores by status."""
         return [chore for chore in self._chores.values() if chore.status == status]
+    
+    def validate_system_integrity(self) -> Dict:
+        """Validate system integrity using lifecycle manager."""
+        return self.lifecycle_manager.validate_system_integrity()
+    
+    def repair_system(self) -> Dict:
+        """Repair system inconsistencies using lifecycle manager."""
+        repair_result = self.lifecycle_manager.repair_system()
+        
+        # Reload chores after repair
+        self._chores.clear()
+        self._load_from_file()
+        
+        return repair_result
+    
+    def validate_chains(self) -> Dict:
+        """Validate chore chain integrity."""
+        return self.lifecycle_manager.validate_chain_integrity(self._chores)

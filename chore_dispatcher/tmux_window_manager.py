@@ -267,7 +267,51 @@ class TMUXWindowManager:
         except (subprocess.CalledProcessError, RuntimeError):
             return False
     
-    def create_chore_window(self, chore_id: int, chore_name: str, session_id: Optional[str] = None) -> bool:
+    def create_chore_window_with_command(self, chore_id: int, chore_name: str, 
+                                       command: str, working_dir: Optional[str] = None,
+                                       session_id: Optional[str] = None) -> bool:
+        """Create dedicated window for chore with automatic command execution."""
+        try:
+            # Use session attachment logic
+            session_info = self.attach_or_create_session(session_id)
+            if not session_info['success']:
+                logger.error(f"Session attachment failed: {session_info.get('error', 'Unknown error')}")
+                return False
+            
+            target_session = session_info['session_name']
+            window_name = f"chore_{chore_id}"
+            tmux_binary = self._get_tmux_binary()
+            
+            # Prepare command with working directory
+            if working_dir:
+                full_command = f'cd "{working_dir}" && {command}'
+            else:
+                full_command = command
+            
+            # Create window with command execution
+            subprocess.run([
+                tmux_binary, 'new-window', '-t', target_session, 
+                '-n', window_name, '-c', working_dir or os.getcwd(),
+                'bash', '-c', f'{full_command}; echo ""; echo "Command completed. Press Enter to continue..."; read'
+            ], check=True)
+            
+            # Set window title to chore name (truncated)
+            title = chore_name[:30] + "..." if len(chore_name) > 30 else chore_name
+            subprocess.run([tmux_binary, 'rename-window', '-t', f"{target_session}:{window_name}", 
+                          title], check=True)
+            
+            # Post-creation validation
+            time.sleep(0.5)
+            if not self._validate_window_created(chore_id, target_session):
+                logger.error(f"Window validation failed: {window_name}")
+                return False
+            
+            logger.info(f"Chore window created with command: {window_name} in session {target_session}")
+            return True
+            
+        except (subprocess.CalledProcessError, RuntimeError) as e:
+            logger.error(f"Window creation with command failed: {e}")
+            return False
         """Create dedicated window for chore with session context."""
         try:
             # Use session attachment logic

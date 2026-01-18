@@ -3,11 +3,15 @@
 from fastmcp import FastMCP
 from chore import Chore, ChoreStatus
 from chore_repository import ChoreRepository
+from dispatcher_hooks import initialize_dispatcher_hooks
 from typing import Optional, List
 
 # Initialize MCP server and repository
 mcp = FastMCP("chore-dispatcher")
 repo = ChoreRepository("/Users/skippo/Development/SkipsChoreData/chores.jsonl")
+
+# Initialize dispatcher hooks
+initialize_dispatcher_hooks()
 
 @mcp.tool()
 def create_chore(name: str, description: str = "") -> dict:

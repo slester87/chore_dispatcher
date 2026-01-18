@@ -5,7 +5,7 @@ Test suite for Newton-Raphson root finding algorithm
 
 import unittest
 import math
-from newton_raphson import NewtonRaphsonSolver
+from .newton_raphson import NewtonRaphsonSolver
 
 class TestNewtonRaphsonSolver(unittest.TestCase):
     

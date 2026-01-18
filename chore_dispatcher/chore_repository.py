@@ -3,6 +3,7 @@ import json
 import os
 from chore import Chore, ChoreStatus
 from chore_lifecycle_manager import create_lifecycle_manager
+from dispatcher_hooks import get_dispatcher_hooks
 
 
 class ChoreRepository:
@@ -75,6 +76,13 @@ class ChoreRepository:
         chore = Chore(name, description)
         self._chores[chore.id] = chore
         self._save_to_file()
+        
+        # Notify dispatcher hooks
+        try:
+            get_dispatcher_hooks().on_chore_created(chore)
+        except Exception as e:
+            print(f"Dispatcher hook failed: {e}")
+            
         return chore
     
     def read(self, chore_id: int) -> Optional[Chore]:
@@ -113,6 +121,12 @@ class ChoreRepository:
                     chain_info = result['chain_activation']
                     print(f"Chain activated: {chain_info['activation_details']}")
                 
+                # Notify dispatcher hooks of state change
+                try:
+                    get_dispatcher_hooks().on_chore_state_change(chore, old_status, status)
+                except Exception as e:
+                    print(f"Dispatcher hook failed: {e}")
+                
                 # If chore was completed and archived, remove from memory
                 if status == ChoreStatus.WORK_DONE:
                     # Archive and remove from active chores
@@ -134,6 +148,12 @@ class ChoreRepository:
     def delete(self, chore_id: int) -> bool:
         """Delete a chore by ID."""
         if chore_id in self._chores:
+            # Notify dispatcher hooks before deletion
+            try:
+                get_dispatcher_hooks().on_chore_deleted(chore_id)
+            except Exception as e:
+                print(f"Dispatcher hook failed: {e}")
+                
             del self._chores[chore_id]
             self._save_to_file()
             return True

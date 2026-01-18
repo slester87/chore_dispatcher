@@ -4,7 +4,7 @@ Test suite for factorial calculator
 """
 
 import unittest
-from factorial_calculator import factorial_recursive, factorial_iterative, validate_input
+from .factorial_calculator import factorial_recursive, factorial_iterative, validate_input
 
 class TestFactorialCalculator(unittest.TestCase):
     

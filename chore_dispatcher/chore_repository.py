@@ -6,7 +6,7 @@ from chore_lifecycle_manager import create_lifecycle_manager
 
 
 class ChoreRepository:
-    def __init__(self, storage_file: str = "chores.jsonl"):
+    def __init__(self, storage_file: str = "/Users/skippo/Development/SkipsChoreData/chores.jsonl"):
         self.storage_file = storage_file
         self.completed_file = storage_file.replace('.jsonl', '_completed.jsonl') if storage_file.endswith('.jsonl') else storage_file + '_completed'
         self._chores: Dict[int, Chore] = {}

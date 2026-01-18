@@ -65,6 +65,7 @@ Examples:
         list_parser = subparsers.add_parser('list', help='List chores')
         list_parser.add_argument('--status', help='Filter by status')
         list_parser.add_argument('--all', action='store_true', help='Show all chores including completed')
+        list_parser.add_argument('--archived', action='store_true', help='Show archived/completed chores only')
         
         # Sessions command - show TMUX sessions
         sessions_parser = subparsers.add_parser('sessions', help='Show TMUX sessions and windows')
@@ -107,6 +108,9 @@ Examples:
     def cmd_list(self, args) -> int:
         """Handle list command."""
         try:
+            if args.archived:
+                return self._list_archived_chores()
+            
             if args.status:
                 try:
                     status = ChoreStatus(args.status.lower())
@@ -130,6 +134,40 @@ Examples:
         except Exception as e:
             print(f"Error listing chores: {e}", file=sys.stderr)
             return 1
+    
+    def _list_archived_chores(self) -> int:
+        """List archived/completed chores."""
+        import json
+        import os
+        
+        archive_file = "/Users/skippo/Development/SkipsChoreData/chores_completed.jsonl"
+        
+        if not os.path.exists(archive_file):
+            print("No archived chores found")
+            return 0
+        
+        archived_chores = []
+        try:
+            with open(archive_file, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        chore_data = json.loads(line)
+                        archived_chores.append(chore_data)
+        except Exception as e:
+            print(f"Error reading archive: {e}", file=sys.stderr)
+            return 1
+        
+        if not archived_chores:
+            print("No archived chores found")
+            return 0
+        
+        print(f"{'ID':<20} {'Status':<12} {'Name'}")
+        print("-" * 60)
+        for chore in archived_chores:
+            print(f"{chore['id']:<20} {chore['status'].upper():<12} {chore['name']}")
+        
+        print(f"\nTotal archived chores: {len(archived_chores)}")
+        return 0
     
     def cmd_update(self, args) -> int:
         """Handle update command."""

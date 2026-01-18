@@ -7,7 +7,7 @@ from typing import Optional, List
 
 # Initialize MCP server and repository
 mcp = FastMCP("Chore Manager")
-repo = ChoreRepository("/Users/skippo/SkipsChoreData/chores.jsonl")
+repo = ChoreRepository("/Users/skippo/Development/SkipsChoreData/chores.jsonl")
 
 @mcp.tool()
 def create_chore(name: str, description: str = "") -> dict:
@@ -118,6 +118,29 @@ def advance_chore_status(chore_id: int) -> Optional[dict]:
 def get_chore_statuses() -> List[str]:
     """Get all possible chore statuses."""
     return [status.value for status in ChoreStatus]
+
+@mcp.tool()
+def list_archived_chores() -> dict:
+    """List archived/completed chores from the archive file."""
+    import json
+    import os
+    
+    archive_file = "/Users/skippo/Development/SkipsChoreData/chores_completed.jsonl"
+    
+    if not os.path.exists(archive_file):
+        return {"archived_chores": [], "message": "No archive file found"}
+    
+    archived_chores = []
+    try:
+        with open(archive_file, 'r') as f:
+            for line in f:
+                if line.strip():
+                    chore_data = json.loads(line)
+                    archived_chores.append(chore_data)
+    except Exception as e:
+        return {"error": f"Failed to read archive: {str(e)}"}
+    
+    return {"archived_chores": archived_chores, "count": len(archived_chores)}
 
 if __name__ == "__main__":
     mcp.run()

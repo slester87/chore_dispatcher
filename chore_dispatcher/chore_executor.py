@@ -68,12 +68,14 @@ class ChoreExecutor:
                 "error": str(e)
             }
     
-    def execute_chore_from_repository(self, chore_id: int, session_id: Optional[str] = None) -> Dict[str, Any]:
+    def execute_chore_from_repository(self, chore_id: int, session_id: Optional[str] = None, 
+                                    data_path: Optional[str] = None) -> Dict[str, Any]:
         """Execute chore directly from repository data."""
         from chore_repository import ChoreRepository
         
         try:
-            repo = ChoreRepository()
+            repo_path = data_path or os.path.expanduser("~/SkipsChoreData/chores.jsonl")
+            repo = ChoreRepository(repo_path)
             chore = repo.read(chore_id)
             
             if not chore:

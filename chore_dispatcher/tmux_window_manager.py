@@ -97,6 +97,47 @@ class TMUXWindowManager:
         invalid_chars = ['/', '*', ' ', '\t', '\n', '\r']
         return not any(char in session_name for char in invalid_chars)
     
+    def get_current_session(self) -> Optional[str]:
+        """Get current TMUX session name."""
+        return self._detect_current_session()
+    
+    def list_sessions(self) -> List[str]:
+        """List all TMUX sessions."""
+        try:
+            tmux_binary = self._get_tmux_binary()
+            result = subprocess.run([
+                tmux_binary, 'list-sessions', '-F', '#{session_name}'
+            ], capture_output=True, text=True, timeout=3)
+            
+            if result.returncode == 0:
+                return [s.strip() for s in result.stdout.strip().split('\n') if s.strip()]
+            return []
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, RuntimeError):
+            return []
+    
+    def list_windows(self, session_name: str) -> List[str]:
+        """List windows in a session."""
+        try:
+            tmux_binary = self._get_tmux_binary()
+            result = subprocess.run([
+                tmux_binary, 'list-windows', '-t', session_name, '-F', '#{window_name}'
+            ], capture_output=True, text=True, timeout=3)
+            
+            if result.returncode == 0:
+                return [w.strip() for w in result.stdout.strip().split('\n') if w.strip()]
+            return []
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError, RuntimeError):
+            return []
+    
+    def attach_to_session(self, session_name: str) -> bool:
+        """Attach to specific session."""
+        try:
+            tmux_binary = self._get_tmux_binary()
+            subprocess.run([tmux_binary, 'attach-session', '-t', session_name], check=True)
+            return True
+        except (subprocess.CalledProcessError, RuntimeError):
+            return False
+
     def _get_target_session(self, session_id: Optional[str] = None) -> str:
         """Get target session with priority handling: explicit → current → fallback.
         
@@ -302,7 +343,7 @@ class TMUXWindowManager:
             
             # Post-creation validation
             time.sleep(0.5)
-            if not self._validate_window_created(chore_id, target_session):
+            if not self._validate_window_created(chore_id, target_session, title):
                 logger.error(f"Window validation failed: {window_name}")
                 return False
             
@@ -346,7 +387,7 @@ class TMUXWindowManager:
             logger.error(f"Window creation failed: {e}")
             return False
     
-    def _validate_window_created(self, chore_id: int, session_name: str) -> bool:
+    def _validate_window_created(self, chore_id: int, session_name: str, expected_title: str = None) -> bool:
         """Validate that the tmux window was actually created."""
         try:
             tmux_binary = self._get_tmux_binary()
@@ -355,14 +396,32 @@ class TMUXWindowManager:
             ], capture_output=True, text=True, timeout=5)
             
             if result.returncode != 0:
+                logger.debug(f"Failed to list windows: {result.stderr}")
                 return False
             
-            # Check if our chore window is in the list
-            window_name = f"chore_{chore_id}"
-            windows = result.stdout.strip().split('\n')
-            return window_name in windows
+            windows = [w.strip() for w in result.stdout.strip().split('\n') if w.strip()]
+            logger.debug(f"Current windows: {windows}")
             
-        except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+            # Look for window by expected title or chore_id pattern
+            if expected_title:
+                # Look for exact or truncated title match
+                for window in windows:
+                    if expected_title in window or window in expected_title:
+                        logger.debug(f"Found matching window by title: {window}")
+                        return True
+            
+            # Fallback: look for chore_id pattern
+            window_name = f"chore_{chore_id}"
+            for window in windows:
+                if window_name in window:
+                    logger.debug(f"Found matching window by ID: {window}")
+                    return True
+            
+            logger.debug(f"Window not found. Expected: {expected_title or window_name}, Available: {windows}")
+            return False
+            
+        except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as e:
+            logger.debug(f"Window validation error: {e}")
             return False
     
     def get_attach_command(self, session_id: Optional[str] = None) -> str:

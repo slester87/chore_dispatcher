@@ -74,8 +74,13 @@ def install_cli():
     # Check if ~/bin is in PATH
     path_dirs = os.environ.get('PATH', '').split(':')
     if install_dir not in path_dirs:
-        print(f"\n⚠️  Add to your shell profile:")
-        print(f"   export PATH=\"$PATH:{install_dir}\"")
+        print(f"\n⚠️  Add to PATH:")
+        print(f"   echo 'export PATH=\"$PATH:{install_dir}\"' >> ~/.bashrc")
+        print(f"   echo 'export PATH=\"$PATH:{install_dir}\"' >> ~/.zshrc")
+        print(f"   source ~/.bashrc  # or ~/.zshrc")
+        print(f"\n   Or run: export PATH=\"$PATH:{install_dir}\"")
+    else:
+        print(f"\n✅ {install_dir} already in PATH")
     
     print(f"\n🎯 Usage:")
     print(f"   chore create \"Task name\" \"Description\"")

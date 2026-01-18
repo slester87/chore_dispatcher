@@ -171,6 +171,10 @@ Examples:
         config_parser.add_argument('--get', help='Get config value')
         config_parser.add_argument('--list', action='store_true', help='List all config')
         
+        # Archive command
+        archive_parser = subparsers.add_parser('archive', help='Archive completed chores')
+        archive_parser.add_argument('--dry-run', action='store_true', help='Show what would be archived')
+        
         # Execute command
         parser.add_argument('-do', '--do', type=int, dest='execute_id', help='Execute chore')
         parser.add_argument('--attach', action='store_true', help='Auto-attach to session')
@@ -250,6 +254,33 @@ Examples:
             print(self.colors.color(f"Config error: {e}", 'red'), file=sys.stderr)
             return 1
     
+    def cmd_archive(self, args) -> int:
+        """Handle archive command."""
+        try:
+            from archive_chores import archive_completed_chores
+            
+            data_path = os.path.expanduser(self.config.get('data_path'))
+            completed_chores = self.repo.find_by_status(ChoreStatus.WORK_DONE)
+            
+            if not completed_chores:
+                print(self.colors.color("No completed chores to archive", 'yellow'))
+                return 0
+            
+            if args.dry_run:
+                print(self.colors.color(f"Would archive {len(completed_chores)} chores:", 'cyan'))
+                for chore in completed_chores:
+                    print(f"  📦 {chore.id}: {chore.name}")
+                return 0
+            
+            archived_count = archive_completed_chores(data_path)
+            if archived_count > 0:
+                print(self.colors.color(f"✅ Archived {archived_count} completed chores", 'green'))
+            
+            return 0
+        except Exception as e:
+            print(self.colors.color(f"Archive error: {e}", 'red'), file=sys.stderr)
+            return 1
+
     def cmd_execute(self, chore_id: int, auto_attach: bool = False) -> int:
         """Enhanced execute with auto-attach option."""
         try:
@@ -294,6 +325,8 @@ Examples:
             return self.cmd_list(parsed_args)
         elif parsed_args.command == 'config':
             return self.cmd_config(parsed_args)
+        elif parsed_args.command == 'archive':
+            return self.cmd_archive(parsed_args)
         
         # Fallback to basic CLI for other commands
         from chore_cli import ChoreCLI

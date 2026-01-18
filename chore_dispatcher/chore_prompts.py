@@ -57,7 +57,10 @@ Before submitting for review, ensure:
 - Known limitations or concerns
 - Specific areas requesting review focus
 
-**AUTHORITY:** Only the Reviewer can advance chores from review phases to completion."""
+**CRITICAL AUTHORITY LIMITATION:**
+⚠️  **YOU CANNOT COMPLETE CHORES** - Only the Reviewer Agent has authority to advance chores from review phases (design_review, plan_review, work_review) to completion phases (design_ready, plan_ready, work_done).
+
+Your role is to implement and submit for review. The Reviewer will validate your work and make the final completion decision."""
 
 
 def build_chore_reviewer_prompt(chore_id: int, chore_data: Dict[str, Any], working_dir: str) -> str:
@@ -110,9 +113,16 @@ def build_chore_reviewer_prompt(chore_id: int, chore_data: Dict[str, Any], worki
 - Guidance for addressing concerns
 - Standards references and examples
 
-**AUTHORITY:** Only YOU can advance chores from review phases to completion phases.
+**EXCLUSIVE COMPLETION AUTHORITY:**
+🔒 **ONLY YOU CAN COMPLETE CHORES** - You have exclusive authority to advance chores from review phases to completion phases. Workers cannot complete their own work.
 
-Trust nothing. Verify everything. Extraordinary claims require extraordinary evidence."""
+**ENFORCEMENT RESPONSIBILITY:**
+- Verify Workers have NOT attempted to self-complete
+- Ensure proper review→completion workflow is followed
+- Maintain quality gate integrity through Byzantine inspection
+- Exercise completion authority judiciously and thoroughly
+
+Trust nothing. Verify everything. You are the final arbiter of quality and completion."""
 
 
 def build_chore_completion_prompt(chore_id: int, chore_data: Dict[str, Any], working_dir: str) -> str:

@@ -79,7 +79,8 @@ Before submitting for review, ensure:
 - ✅ **Tests** pass completely (unit, integration, system)
 - ✅ **Performance** meets acceptable benchmarks
 
-**Note:** Only the Reviewer can advance chores from review phases to completion.
+**CRITICAL AUTHORITY LIMITATION:**
+⚠️  **YOU CANNOT COMPLETE CHORES** - Only the Reviewer Agent has authority to advance chores from review phases to completion phases. Your role is implementation and submission for review.
 
 Focus on implementation excellence and clear communication.
 """
@@ -155,6 +156,9 @@ Provide detailed feedback via **review_info** field:
 1. **APPROVE** - Advance to next phase (design_ready, plan_ready, work_done)
 2. **REJECT** - Send back to previous phase with detailed feedback
 3. **CONDITIONAL** - Approve with specific requirements for next phase
+
+**EXCLUSIVE COMPLETION AUTHORITY:**
+🔒 **ONLY YOU CAN COMPLETE CHORES** - You have exclusive authority to advance chores from review phases to completion phases. Workers cannot complete their own work. Maintain quality gate integrity through Byzantine inspection.
 
 ## Workflow State: {chore['status'].upper()}
 {"Conduct thorough review and provide detailed feedback." if chore['status'].endswith('_review') else "Work not yet ready for review."}

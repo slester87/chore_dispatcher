@@ -119,7 +119,7 @@ class ChoreRepository:
                     pass
                 
             except Exception as e:
-                print(f"Lifecycle transition failed: {e}")
+                print(f"Lifecycle transition failed for chore {chore_id}: {e}")
                 # Fallback to old behavior
                 chore.status = status
                 self._save_to_file()

@@ -14,10 +14,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from chore_repository import ChoreRepository
 from chore import ChoreStatus
 
+# Default data directory - can be overridden by users
+DEFAULT_DATA_DIR = "SkipsChoreData"
+
 
 def archive_completed_chores(data_path: str = None) -> int:
     """Archive all completed chores to chores_completed.jsonl."""
-    data_path = data_path or os.path.expanduser("~/SkipsChoreData/chores.jsonl")
+    data_path = data_path or os.path.expanduser(f"~/{DEFAULT_DATA_DIR}/chores.jsonl")
     completed_path = data_path.replace('.jsonl', '_completed.jsonl')
     
     repo = ChoreRepository(data_path)
@@ -74,6 +77,7 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:
         print("Usage: python3 archive_chores.py [data_path]")
         print("Archive all completed (WORK_DONE) chores to chores_completed.jsonl")
+        print(f"Default data directory: ~/{DEFAULT_DATA_DIR}/")
         return 0
     
     data_path = sys.argv[1] if len(sys.argv) > 1 else None

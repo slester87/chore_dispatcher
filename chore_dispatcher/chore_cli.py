@@ -24,12 +24,15 @@ from chore import ChoreStatus
 from chore_executor import ChoreExecutor
 from tmux_window_manager import TMUXWindowManager
 
+# Default data directory - can be overridden by users
+DEFAULT_DATA_DIR = "SkipsChoreData"
+
 
 class ChoreCLI:
     """Command-line interface for chore management."""
     
     def __init__(self, data_path: str = None):
-        self.data_path = data_path or os.path.expanduser("~/SkipsChoreData/chores.jsonl")
+        self.data_path = data_path or os.path.expanduser(f"~/{DEFAULT_DATA_DIR}/chores.jsonl")
         self.repo = ChoreRepository(self.data_path)
         self.executor = ChoreExecutor()
         self.tmux = TMUXWindowManager()

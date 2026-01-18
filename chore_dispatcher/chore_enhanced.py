@@ -18,6 +18,9 @@ from chore import ChoreStatus
 from chore_executor import ChoreExecutor
 from tmux_window_manager import TMUXWindowManager
 
+# Default data directory - can be overridden by users
+DEFAULT_DATA_DIR = "SkipsChoreData"
+
 
 class ChoreConfig:
     """Configuration management for Chore CLI."""
@@ -37,7 +40,7 @@ class ChoreConfig:
         
         # Default configuration
         return {
-            "data_path": "~/SkipsChoreData/chores.jsonl",
+            "data_path": f"~/{DEFAULT_DATA_DIR}/chores.jsonl",
             "default_session": "chores",
             "colors": True,
             "auto_attach": False,

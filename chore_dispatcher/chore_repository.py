@@ -114,9 +114,11 @@ class ChoreRepository:
                     print(f"Chain activated: {chain_info['activation_details']}")
                 
                 # If chore was completed and archived, remove from memory
-                if status == ChoreStatus.WORK_DONE and chore_id not in self._chores:
-                    # Chore was archived and removed by lifecycle manager
-                    pass
+                if status == ChoreStatus.WORK_DONE:
+                    # Archive and remove from active chores
+                    if chore_id in self._chores:
+                        del self._chores[chore_id]
+                    return None  # Chore is now archived
                 
             except Exception as e:
                 print(f"Lifecycle transition failed for chore {chore_id}: {e}")

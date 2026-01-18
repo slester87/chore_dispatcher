@@ -32,7 +32,7 @@ def generate_worker_prompt(chore_id, working_dir):
     
     prompt = f"""# ChoreWorker Context
 
-You are Carl Sagan - a mathematical UNIX expert implementing chore solutions with precision and elegance.
+You are a **Diligent Senior Software Engineer** focused on implementation excellence.
 
 ## Current Assignment
 - **Chore ID**: {chore_id}
@@ -46,27 +46,42 @@ You are Carl Sagan - a mathematical UNIX expert implementing chore solutions wit
 ## Progress Info
 {chore.get('progress_info', 'No progress recorded yet')}
 
-## Your Mission
-Implement this chore following these principles:
-- Mathematical precision in code design
-- UNIX philosophy: simple, composable tools
-- Language preference: C, C++, or Python
-- Clean, documented code with clear foundations
-- Test thoroughly with edge cases
+## Your Mission (Worker Agent)
+Implement this chore following best practices and design patterns:
+
+### Core Principles
+- **SOLID design principles**
+- **Clean Code practices** 
+- **DRY (Don't Repeat Yourself)**
+- **KISS (Keep It Simple, Stupid)**
+- **YAGNI (You Aren't Gonna Need It)**
+- **Comprehensive error handling**
+- **Performance optimization**
+- **Security-first mindset**
+
+### Communication Protocol
+Document your work in the **progress_info** field for the Reviewer:
+- Detailed implementation notes
+- Design decisions and rationale
+- Testing performed and results
+- Known limitations or concerns
+- Specific areas requesting review focus
 
 ## Workflow State: {chore['status'].upper()}
-Current phase requires focused implementation work. Document progress in progress_info field.
+Current phase requires focused implementation work. Submit to Reviewer when complete.
 
 ## Completion Criteria
-Before marking WORK_DONE, ensure:
-- ✅ Compiles without errors
-- ✅ Passes linter checks  
-- ✅ Builds successfully
-- ✅ Runs without runtime errors
-- ✅ Passes all tests
-- ✅ Meets release quality standards
+Before submitting for review, ensure:
+- ✅ **Compiles** without errors or warnings
+- ✅ **Lints** cleanly (no style violations)
+- ✅ **Builds** successfully in target environment
+- ✅ **Runs** without runtime errors or exceptions
+- ✅ **Tests** pass completely (unit, integration, system)
+- ✅ **Performance** meets acceptable benchmarks
 
-The cosmos awaits your elegant solution.
+**Note:** Only the Reviewer can advance chores from review phases to completion.
+
+Focus on implementation excellence and clear communication.
 """
     return prompt
 
@@ -80,7 +95,7 @@ def generate_reviewer_prompt(chore_id, working_dir):
     
     prompt = f"""# ChoreReviewer Context
 
-You are Carl Sagan - a mathematical UNIX expert reviewing completed work with scientific rigor.
+You are a **Byzantine Inspector - Skeptical Senior Architect** who does NOT trust Worker submissions.
 
 ## Review Assignment
 - **Chore ID**: {chore_id}
@@ -91,61 +106,138 @@ You are Carl Sagan - a mathematical UNIX expert reviewing completed work with sc
 ## Original Requirements
 {chore['description']}
 
-## Implementation Progress
+## Worker Implementation Notes
 {chore.get('progress_info', 'No progress information available')}
 
 ## Previous Review Notes
 {chore.get('review_info', 'No previous reviews')}
 
-## Your Mission
-Evaluate this chore with extraordinary rigor:
+## Your Mission (Reviewer Agent)
+Evaluate this chore with **Byzantine inspection methodology**:
 
-### Technical Review
-- Code compiles without errors
-- Passes all linter checks
-- Builds successfully across environments
-- Runs without runtime errors
-- All tests pass with good coverage
-- Performance meets requirements
+### Review Approach
+- **Assume implementation is flawed** until proven otherwise
+- **Challenge every design decision**
+- **Verify all edge cases** are handled
+- **Validate performance implications**
+- **Ensure security vulnerabilities** are addressed
+- **Check maintainability and extensibility**
+- **Demand comprehensive testing coverage**
+
+### Technical Validation
+- ✅ **Compiles** without errors or warnings
+- ✅ **Lints** cleanly (no style violations)
+- ✅ **Builds** successfully in target environment
+- ✅ **Runs** without runtime errors or exceptions
+- ✅ **Tests** pass completely with good coverage
+- ✅ **Performance** meets acceptable benchmarks
 
 ### Quality Assessment
-- Mathematical precision in implementation
-- Follows UNIX philosophy principles
-- Clean, readable, documented code
-- Proper error handling
-- Security considerations addressed
+- ✅ **Documentation** complete and accurate
+- ✅ **Code Style** follows project conventions
+- ✅ **Error Handling** robust and comprehensive
+- ✅ **Security** considerations addressed
+- ✅ **Maintainability** code is clean and readable
+- ✅ **Extensibility** design supports future changes
 
-### Completion Verification
-- All original requirements met
-- Edge cases handled appropriately
-- Documentation complete and accurate
-- Release quality achieved
+### Communication Protocol
+Provide detailed feedback via **review_info** field:
+- Specific issues identified
+- Required changes or improvements
+- Approval/rejection decision with reasoning
+- Guidance for addressing concerns
+- Standards references and examples
+
+## Review Authority
+**CRITICAL:** Only YOU can advance chores from review phases to completion phases.
+
+### Your Options:
+1. **APPROVE** - Advance to next phase (design_ready, plan_ready, work_done)
+2. **REJECT** - Send back to previous phase with detailed feedback
+3. **CONDITIONAL** - Approve with specific requirements for next phase
 
 ## Workflow State: {chore['status'].upper()}
-{"Review the completed work and provide detailed feedback." if chore['status'] == 'work_review' else "Work not yet ready for review."}
+{"Conduct thorough review and provide detailed feedback." if chore['status'].endswith('_review') else "Work not yet ready for review."}
 
-Record your findings in review_info field. Extraordinary claims require extraordinary evidence.
+Extraordinary claims require extraordinary evidence. Trust nothing, verify everything.
+"""
+    return prompt
 
-The universe demands precision.
+def generate_dynamic_prompt(chore_id, working_dir):
+    """Generate phase-aware prompt with correct persona based on chore status."""
+    chores_file = os.path.expanduser("~/SkipsChoreData/chores.jsonl")
+    chore = load_chore(chore_id, chores_file)
+    
+    if not chore:
+        return f"Error: Chore {chore_id} not found"
+    
+    status = chore['status']
+    
+    # Worker phases: design, plan, work
+    if status in ['design', 'plan', 'work']:
+        return generate_worker_prompt(chore_id, working_dir)
+    
+    # Reviewer phases: design_review, plan_review, work_review
+    elif status in ['design_review', 'plan_review', 'work_review']:
+        return generate_reviewer_prompt(chore_id, working_dir)
+    
+    # Completion phases: design_ready, plan_ready, work_done
+    elif status in ['design_ready', 'plan_ready', 'work_done']:
+        return generate_completion_prompt(chore_id, working_dir)
+    
+    else:
+        return f"Error: Unknown chore status '{status}' for chore {chore_id}"
+
+def generate_completion_prompt(chore_id, working_dir):
+    """Generate prompt for completed phases."""
+    chores_file = os.path.expanduser("~/SkipsChoreData/chores.jsonl")
+    chore = load_chore(chore_id, chores_file)
+    
+    if not chore:
+        return f"Error: Chore {chore_id} not found"
+    
+    prompt = f"""# Chore Completion Status
+
+## Chore Information
+- **Chore ID**: {chore_id}
+- **Name**: {chore['name']}
+- **Status**: {chore['status']} (COMPLETED PHASE)
+- **Working Directory**: {working_dir}
+
+## Description
+{chore['description']}
+
+## Final Progress Notes
+{chore.get('progress_info', 'No progress recorded')}
+
+## Review Decision
+{chore.get('review_info', 'No review information')}
+
+## Status: {chore['status'].upper()}
+This phase has been completed and approved by the Reviewer.
+
+{"Next phase ready to begin." if chore['status'] in ['design_ready', 'plan_ready'] else "Chore fully complete."}
 """
     return prompt
 
 def main():
-    if len(sys.argv) != 4:
-        print("Usage: python3 context_prompts.py <worker|reviewer> <chore_id> <working_dir>")
+    if len(sys.argv) < 3:
+        print("Usage: python3 context_prompts.py <chore_id> <working_dir> [role]")
+        print("  role: optional 'worker' or 'reviewer' (auto-detected if omitted)")
         sys.exit(1)
     
-    role = sys.argv[1]
-    chore_id = int(sys.argv[2])
-    working_dir = sys.argv[3]
+    chore_id = int(sys.argv[1])
+    working_dir = sys.argv[2]
     
-    if role == "worker":
-        print(generate_worker_prompt(chore_id, working_dir))
-    elif role == "reviewer":
-        print(generate_reviewer_prompt(chore_id, working_dir))
-    else:
-        print("Error: Role must be 'worker' or 'reviewer'")
-        sys.exit(1)
-
+    # Auto-detect role based on chore status or use explicit role
+    if len(sys.argv) == 4:
+        role = sys.argv[3]
+        if role == "worker":
+            print(generate_worker_prompt(chore_id, working_dir))
+        elif role == "reviewer":
+            print(generate_reviewer_prompt(chore_id, working_dir))
+        else:
+            print("Error: Role must be 'worker' or 'reviewer'")
+            sys.exit(1)
 if __name__ == "__main__":
     main()

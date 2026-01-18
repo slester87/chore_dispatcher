@@ -13,24 +13,60 @@ The TMUX Chore Integration provides live monitoring of your active chores direct
 - Python 3.6 or later
 - SkipsChoreData repository with active chores
 
+### Install TMUX
+
+If TMUX is not installed:
+
+**macOS (Homebrew):**
+```bash
+brew install tmux
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install tmux
+```
+
+**CentOS/RHEL:**
+```bash
+sudo yum install tmux
+```
+
+**Verify installation:**
+```bash
+tmux -V  # Should show version 2.1 or later
+```
+
 ### Setup Steps
 
 1. **Copy the status script** to your preferred location:
    ```bash
+   # From chore_dispatcher directory
    cp tmux_chore_status.py ~/.local/bin/
    chmod +x ~/.local/bin/tmux_chore_status.py
+   
+   # Or use full path directly
+   chmod +x /path/to/chore_dispatcher/tmux_chore_status.py
    ```
 
 2. **Add to your `.tmux.conf`** (choose one format):
 
    **Summary Format** - Shows count by status:
    ```bash
+   # Using copied script
    set -g status-right "#(python3 ~/.local/bin/tmux_chore_status.py) | %H:%M %d-%b-%y"
+   
+   # Or using full path
+   set -g status-right "#(python3 /path/to/chore_dispatcher/tmux_chore_status.py) | %H:%M %d-%b-%y"
    ```
 
    **Current Chore Format** - Shows first active chore:
    ```bash
+   # Using copied script
    set -g status-right "#(python3 ~/.local/bin/tmux_chore_status.py --current) | %H:%M"
+   
+   # Or using full path
+   set -g status-right "#(python3 /path/to/chore_dispatcher/tmux_chore_status.py --current) | %H:%M"
    ```
 
 3. **Reload TMUX configuration**:
@@ -120,8 +156,14 @@ set -g status-right "#(python3 ~/.local/bin/tmux_chore_status.py) | #(git branch
 python3 ~/.local/bin/tmux_chore_status.py
 python3 ~/.local/bin/tmux_chore_status.py --current
 
+# Or test with full path
+python3 /path/to/chore_dispatcher/tmux_chore_status.py
+
 # Check for Python errors
 python3 -c "import json, os; print('Python OK')"
+
+# Verify chores file exists
+ls -la ~/SkipsChoreData/chores.jsonl
 ```
 
 ### Status Not Updating

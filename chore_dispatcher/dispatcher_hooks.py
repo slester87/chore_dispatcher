@@ -27,10 +27,27 @@ class DispatcherHooks:
                     logger.info(f"Creating worker window for chore {chore.id} ({new_status.value})")
                     self.dispatcher.create_worker_window(chore)
                     
+            # Create reviewer pane for review phases
+            elif new_status in [ChoreStatus.DESIGN_REVIEW, ChoreStatus.PLAN_REVIEW, ChoreStatus.WORK_REVIEW]:
+                logger.info(f"Creating reviewer pane for chore {chore.id} ({new_status.value})")
+                self.dispatcher.create_reviewer_pane(chore)
+                    
             # Cleanup window when work is done
             elif new_status == ChoreStatus.WORK_DONE:
                 logger.info(f"Cleaning up worker window for completed chore {chore.id}")
                 self.dispatcher.cleanup_worker_window(chore.id)
+                
+            # Cleanup reviewer pane when transitioning out of review phases
+            if old_status in [ChoreStatus.DESIGN_REVIEW, ChoreStatus.PLAN_REVIEW, ChoreStatus.WORK_REVIEW]:
+                if new_status not in [ChoreStatus.DESIGN_REVIEW, ChoreStatus.PLAN_REVIEW, ChoreStatus.WORK_REVIEW]:
+                    logger.info(f"Cleaning up reviewer pane for chore {chore.id}")
+                    self.dispatcher.cleanup_reviewer_pane(chore)
+                
+            # Update context when status changes
+            if old_status != new_status:
+                self.dispatcher.update_chore_context(chore)
+                # Rename window to reflect new status
+                self.dispatcher.rename_chore_window(chore)
                 
         except Exception as e:
             logger.error(f"Dispatcher hook failed for chore {chore.id}: {e}")

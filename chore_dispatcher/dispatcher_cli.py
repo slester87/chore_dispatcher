@@ -40,54 +40,32 @@ def handle_dispatcher_command(args: argparse.Namespace) -> int:
         return 1
 
 def _handle_status(dispatcher: ChoreDispatcher) -> int:
-    """Handle status command."""
-    try:
-        windows = dispatcher.list_active_windows()
-        
-        if not windows:
-            print("No active chore windows")
-            return 0
-            
-        print(f"Active windows in session '{dispatcher.session_name}':")
-        for window in windows:
-            status = "ACTIVE" if window['active'] else "inactive"
-            print(f"  {window['name']} ({status})")
-            
+    """Enhanced status command with detailed info."""
+    windows = dispatcher.list_detailed_windows()
+    
+    if not windows:
+        print("No active chore windows")
         return 0
+    
+    print(f"Active windows in session '{dispatcher.session_name}':")
+    for window in windows:
+        status = "ACTIVE" if window['active'] else "inactive"
+        panes = f"{window['panes']} pane{'s' if window['panes'] != 1 else ''}"
+        chore_status = window.get('status', 'unknown')
+        chore_id = window.get('chore_id', 'unknown')
+        pane_roles = window.get('pane_roles', [])
         
-    except Exception as e:
-        print(f"Failed to get status: {e}", file=sys.stderr)
-        return 1
+        roles_str = f" ({', '.join(pane_roles)})" if pane_roles else ""
+        print(f"  {window['name']} (ID: {chore_id}, {status}, {panes}{roles_str}, {chore_status})")
+    
+    return 0
 
 def _handle_attach(dispatcher: ChoreDispatcher, chore_id: Optional[int]) -> int:
-    """Handle attach command."""
-    try:
-        if chore_id:
-            # Focus specific chore window
-            windows = dispatcher.list_active_windows()
-            target_window = None
-            
-            for window in windows:
-                if window['name'].startswith(f"chore-{chore_id}-"):
-                    target_window = window['name']
-                    break
-                    
-            if not target_window:
-                print(f"No window found for chore {chore_id}", file=sys.stderr)
-                return 1
-                
-            # Select window and attach
-            import subprocess
-            subprocess.run([
-                "tmux", "select-window", "-t", f"{dispatcher.session_name}:{target_window}"
-            ], check=True)
-            
-        # Attach to session
+    """Enhanced attach with chore-specific targeting."""
+    if chore_id:
+        return 0 if dispatcher.attach_to_chore_window(chore_id) else 1
+    else:
         return 0 if dispatcher.attach_to_session() else 1
-        
-    except Exception as e:
-        print(f"Failed to attach: {e}", file=sys.stderr)
-        return 1
 
 def _handle_cleanup(dispatcher: ChoreDispatcher) -> int:
     """Handle cleanup command."""

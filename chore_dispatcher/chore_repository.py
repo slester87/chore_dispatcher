@@ -26,8 +26,17 @@ class ChoreRepository:
                     chore = self._dict_to_chore(data)
                     self._chores[chore.id] = chore
         
-        # Link chore chains
+        # Link chore chains and parent-child relationships
         self._link_chore_chains()
+        self._link_parent_child_relationships()
+    
+    def _link_parent_child_relationships(self):
+        """Link parent-child relationships based on parent_chore_id references."""
+        for chore in self._chores.values():
+            if chore.parent_chore_id:
+                parent_chore = self._chores.get(chore.parent_chore_id)
+                if parent_chore:
+                    parent_chore.sub_chores.append(chore)
     
     def _link_chore_chains(self):
         """Link chores based on next_chore_id references"""
@@ -54,7 +63,8 @@ class ChoreRepository:
             'status': chore.status.value,
             'next_chore_id': chore.next_chore.id if chore.next_chore else None,
             'progress_info': chore.progress_info,
-            'review_info': chore.review_info
+            'review_info': chore.review_info,
+            'parent_chore_id': chore.parent_chore_id
         }
     
     def _dict_to_chore(self, data: dict) -> Chore:
@@ -67,10 +77,53 @@ class ChoreRepository:
         chore.next_chore = None  # Will be linked after all chores loaded
         chore.progress_info = data.get('progress_info')
         chore.review_info = data.get('review_info')
+        chore.parent_chore_id = data.get('parent_chore_id')
+        chore.sub_chores = []  # Will be populated after all chores loaded
         # Store next_chore_id for linking
         chore._next_chore_id = data.get('next_chore_id')
         return chore
     
+    def create_sub_chore(self, parent_id: int, name: str, description: str = "") -> Optional[Chore]:
+        """Create a sub-chore under a parent chore."""
+        parent_chore = self._chores.get(parent_id)
+        if not parent_chore:
+            return None
+            
+        sub_chore = Chore(name, description, parent_chore_id=parent_id)
+        parent_chore.add_sub_chore(sub_chore)
+        self._chores[sub_chore.id] = sub_chore
+        self._save_to_file()
+        
+        # Notify dispatcher hooks
+        try:
+            get_dispatcher_hooks().on_chore_created(sub_chore)
+        except Exception as e:
+            print(f"Dispatcher hook failed: {e}")
+            
+        return sub_chore
+    
+    def get_sub_chores(self, parent_id: int) -> List[Chore]:
+        """Get all sub-chores of a parent chore."""
+        parent_chore = self._chores.get(parent_id)
+        if not parent_chore:
+            return []
+        return parent_chore.get_sub_chores()
+    
+    def get_parent_chore(self, chore_id: int) -> Optional[Chore]:
+        """Get the parent chore of a sub-chore."""
+        chore = self._chores.get(chore_id)
+        if not chore or not chore.is_sub_chore:
+            return None
+        return self._chores.get(chore.parent_chore_id)
+    
+    def find_by_parent_id(self, parent_id: int) -> List[Chore]:
+        """Find all chores with the given parent ID."""
+        return [chore for chore in self._chores.values() if chore.parent_chore_id == parent_id]
+    
+    def find_root_chores(self) -> List[Chore]:
+        """Find all chores with no parent (root chores)."""
+        return [chore for chore in self._chores.values() if not chore.is_sub_chore]
+
     def create(self, name: str, description: str = "") -> Chore:
         """Create a new chore."""
         chore = Chore(name, description)
@@ -146,18 +199,31 @@ class ChoreRepository:
         return chore
     
     def delete(self, chore_id: int) -> bool:
-        """Delete a chore by ID."""
-        if chore_id in self._chores:
-            # Notify dispatcher hooks before deletion
-            try:
-                get_dispatcher_hooks().on_chore_deleted(chore_id)
-            except Exception as e:
-                print(f"Dispatcher hook failed: {e}")
-                
-            del self._chores[chore_id]
-            self._save_to_file()
-            return True
-        return False
+        """Delete a chore by ID. Also deletes all sub-chores."""
+        if chore_id not in self._chores:
+            return False
+            
+        chore = self._chores[chore_id]
+        
+        # Delete all sub-chores first
+        for sub_chore in chore.get_sub_chores():
+            self.delete(sub_chore.id)
+        
+        # Remove from parent's sub_chores list if this is a sub-chore
+        if chore.is_sub_chore:
+            parent_chore = self._chores.get(chore.parent_chore_id)
+            if parent_chore:
+                parent_chore.sub_chores = [sc for sc in parent_chore.sub_chores if sc.id != chore_id]
+        
+        # Notify dispatcher hooks before deletion
+        try:
+            get_dispatcher_hooks().on_chore_deleted(chore_id)
+        except Exception as e:
+            print(f"Dispatcher hook failed: {e}")
+            
+        del self._chores[chore_id]
+        self._save_to_file()
+        return True
     
     def list_all(self) -> List[Chore]:
         """List all chores."""

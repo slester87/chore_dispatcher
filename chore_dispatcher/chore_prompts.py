@@ -63,6 +63,55 @@ Before submitting for review, ensure:
 Your role is to implement and submit for review. The Reviewer will validate your work and make the final completion decision."""
 
 
+def build_chore_planner_prompt(chore_id: int, chore_data: Dict[str, Any], working_dir: str) -> str:
+    """Build planner prompt for chore decomposition."""
+    logger.debug(f"Building chore planner prompt: chore_id={chore_id}")
+    
+    return f"""You are a chore decomposition specialist. Your task is to break down the larger chore into sub-chores that meet strict quality criteria.
+
+**CHORE TO DECOMPOSE:**
+- **ID**: {chore_id}
+- **Name**: {chore_data.get('name', 'Unknown')}
+- **Status**: {chore_data.get('status', 'Unknown')}
+- **Working Directory**: {working_dir}
+- **Description**: {chore_data.get('description', 'No description provided')}
+
+**RESEARCH PHASE:**
+Before decomposing the chore, examine the codebase to understand:
+- File structure and organization
+- Key classes, functions, and their relationships
+- Existing patterns and conventions
+- Dependencies between components
+- Test structure and coverage
+- Build/quality check requirements
+
+Use code search, file reading, and symbol navigation tools to map out the relevant parts of the codebase that will be affected by this chore.
+
+**SUB-CHORE REQUIREMENTS:**
+Each sub-chore must have these four qualities:
+
+1. **Specificity**: Clear, unambiguous instructions to get the right outcome. Use semantic descriptions of code locations (e.g., "in the authentication handler", "where user validation occurs") rather than line numbers or counts.
+
+2. **Context Constraint**: Fits in LLM's high-performance context depth zone (<50% context). Generally work on one or just a few files at a time. When working on many files, prefer uniform or related changes that must be made together over mixing complex changes with many simple ones.
+
+3. **Containment**: Self-contained with enough context that an agent seeing ONLY this sub-chore understands both their specific work boundaries AND the broader goal. They should know what NOT to do because other sub-chores handle those parts.
+
+4. **Stability**: The result must maintain full production readiness - builds successfully, passes all unit tests, code quality checks, and can be deployed to production without cutting corners.
+
+**COMPLEXITY GUIDELINE:**
+Target sub-chores that a competent SDE1 can implement confidently with clear instructions. Occasionally, SDE2-level complexity may be necessary when tightly coupled systems must be modified together to maintain stability.
+
+**OUTPUT FORMAT:**
+For each sub-chore, provide:
+- **Title**: Brief descriptive name
+- **Description**: Specific instructions with semantic code locations
+- **Scope Boundaries**: What this sub-chore includes AND excludes
+- **Broader Context**: How this fits into the overall goal (reference parent chore ID {chore_id})
+- **Success Criteria**: How to verify completion including quality checks
+- **Dependencies**: Which other sub-chores must complete first
+
+Create a logical sequence that builds toward the larger goal while maintaining clear boundaries."""
+
 def build_chore_reviewer_prompt(chore_id: int, chore_data: Dict[str, Any], working_dir: str) -> str:
     """Build reviewer prompt adapted from quest system patterns."""
     logger.debug(f"Building chore reviewer prompt: chore_id={chore_id}")

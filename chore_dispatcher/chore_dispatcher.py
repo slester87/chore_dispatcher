@@ -327,6 +327,62 @@ class ChoreDispatcher:
             logger.error(f"Failed to create reviewer pane: {e}")
             return False
             
+    def create_planner_pane(self, chore: Chore) -> bool:
+        """Create planner pane for chore planning phase."""
+        window_name = self._get_window_name(chore)
+        
+        try:
+            # Check if window exists, if not create worker window first
+            if not self._window_exists(window_name):
+                if not self.create_worker_window(chore):
+                    return False
+            
+            # Generate planner context
+            context = self._generate_chore_context(chore, "planner")
+            command = self._build_env_command(context, f"{self.kiro_cli_path} chat --trust-tools {self.trusted_tools}")
+            
+            # Split window to create planner pane
+            subprocess.run([
+                "tmux", "split-window", 
+                "-t", f"{self.session_name}:{window_name}",
+                "-h", "-c", "/Users/skippo/Development/KIRO",
+                command
+            ], check=True)
+            
+            # Set pane title for planner
+            subprocess.run([
+                "tmux", "select-pane", "-t", f"{self.session_name}:{window_name}.1",
+                "-T", "planner"
+            ], check=True)
+            
+            logger.info(f"Created planner pane for chore {chore.id}")
+            return True
+            
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Failed to create planner pane: {e}")
+            return False
+
+    def cleanup_planner_pane(self, chore: Chore) -> bool:
+        """Cleanup planner pane for chore."""
+        window_name = self._get_window_name(chore)
+        
+        try:
+            # Check if window exists
+            if not self._window_exists(window_name):
+                return True  # Already cleaned up
+                
+            # Kill pane 1 (planner pane) if it exists
+            subprocess.run([
+                "tmux", "kill-pane", "-t", f"{self.session_name}:{window_name}.1"
+            ], check=True)
+            
+            logger.info(f"Cleaned up planner pane: {window_name}")
+            return True
+            
+        except subprocess.CalledProcessError:
+            # Pane doesn't exist or already cleaned up
+            return True
+
     def cleanup_reviewer_pane(self, chore: Chore) -> bool:
         """Remove reviewer pane while preserving worker pane."""
         window_name = self._get_window_name(chore)

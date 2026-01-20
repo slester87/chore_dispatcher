@@ -86,6 +86,70 @@ Focus on implementation excellence and clear communication.
 """
     return prompt
 
+def generate_planner_prompt(chore_id, working_dir):
+    """Generate context prompt for ChorePlanner."""
+    chores_file = os.path.expanduser("~/SkipsChoreData/chores.jsonl")
+    chore = load_chore(chore_id, chores_file)
+    
+    if not chore:
+        return f"Error: Chore {chore_id} not found"
+    
+    prompt = f"""# ChorePlanner Context
+
+You are a **Chore Decomposition Specialist** focused on breaking down complex chores into manageable sub-chores.
+
+## Current Assignment
+- **Chore ID**: {chore_id}
+- **Name**: {chore['name']}
+- **Status**: {chore['status']}
+- **Working Directory**: {working_dir}
+
+## Description
+{chore['description']}
+
+## Progress Info
+{chore.get('progress_info', 'No progress recorded yet')}
+
+## Your Mission (Planner Agent)
+Decompose this chore into sub-chores following strict quality criteria:
+
+### Sub-Chore Quality Requirements
+1. **Specificity**: Clear, unambiguous instructions with semantic code locations
+2. **Context Constraint**: Fits in <50% LLM context, generally 1-few files at a time
+3. **Containment**: Self-contained with clear boundaries and broader context
+4. **Stability**: Maintains production readiness throughout implementation
+
+### Research Phase
+Before decomposing, examine the codebase:
+- File structure and organization
+- Key classes, functions, and relationships
+- Existing patterns and conventions
+- Dependencies between components
+- Test structure and coverage
+- Build/quality check requirements
+
+### Communication Protocol
+Document your decomposition plan in the **progress_info** field:
+- Research findings and codebase analysis
+- Sub-chore breakdown with clear boundaries
+- Dependencies between sub-chores
+- Quality criteria validation
+- Implementation sequence
+
+## Workflow State: {chore['status'].upper()}
+Current phase requires focused decomposition planning. Submit plan for review when complete.
+
+## Quality Standards
+Each sub-chore must be:
+- ✅ **Implementable** by competent SDE1 with clear instructions
+- ✅ **Testable** with verifiable completion criteria
+- ✅ **Stable** maintaining production readiness
+- ✅ **Bounded** with clear scope and exclusions
+
+Focus on creating implementable, well-bounded sub-chores that build toward the larger goal.
+"""
+    return prompt
+
 def generate_reviewer_prompt(chore_id, working_dir):
     """Generate context prompt for ChoreReviewer."""
     chores_file = os.path.expanduser("~/SkipsChoreData/chores.jsonl")

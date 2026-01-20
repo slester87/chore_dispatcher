@@ -15,6 +15,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from chore import Chore, ChoreStatus
 from chore_repository import ChoreRepository
+from chore_decomposer import ChoreDecomposer
+from chore_reviewer import ChoreReviewer
 from chore_lifecycle_manager import create_lifecycle_manager
 from tmux_window_manager import TMUXWindowManager
 from chore_prompts import get_chore_prompt, build_chore_worker_prompt, build_chore_reviewer_prompt
@@ -156,6 +158,21 @@ class TestPromptSystem(unittest.TestCase):
         self.assertIn('Byzantine Inspector', prompt)
         self.assertIn('assume the Worker', prompt)
     
+    def test_planner_prompt_generation(self):
+        """Test planner prompt generation."""
+        from chore_prompts import build_chore_planner_prompt
+        
+        chore_data = {
+            'name': 'Test Chore',
+            'status': 'plan',
+            'description': 'Test description'
+        }
+        
+        prompt = build_chore_planner_prompt(12345, chore_data, "/test/dir")
+        self.assertIn("chore decomposition specialist", prompt.lower())
+        self.assertIn("Test Chore", prompt)
+        self.assertIn("12345", prompt)
+
     def test_dynamic_prompt_selection(self):
         """Test dynamic prompt selection."""
         # Worker phase
@@ -232,6 +249,158 @@ class TestLifecycleManager(unittest.TestCase):
         self.assertIn('valid', result)
         self.assertIn('active_count', result)
         self.assertIn('completed_count', result)
+
+
+class TestSubChoreSupport(unittest.TestCase):
+    """Test sub-chore functionality."""
+    
+    def setUp(self):
+        self.parent_chore = Chore("Parent Chore", "Parent description")
+        self.sub_chore = Chore("Sub Chore", "Sub description")
+    
+    def test_add_sub_chore(self):
+        """Test adding sub-chores."""
+        self.parent_chore.add_sub_chore(self.sub_chore)
+        
+        self.assertTrue(self.parent_chore.is_parent)
+        self.assertTrue(self.sub_chore.is_sub_chore)
+        self.assertEqual(self.sub_chore.parent_chore_id, self.parent_chore.id)
+        self.assertIn(self.sub_chore, self.parent_chore.get_sub_chores())
+    
+    def test_can_advance_with_incomplete_sub_chores(self):
+        """Test that parent cannot advance with incomplete sub-chores."""
+        self.parent_chore.add_sub_chore(self.sub_chore)
+        
+        # Sub-chore is not complete
+        self.assertFalse(self.parent_chore.can_advance())
+        self.assertFalse(self.parent_chore.advance_status())
+
+
+class TestHierarchicalRepository(unittest.TestCase):
+    """Test hierarchical repository operations."""
+    
+    def setUp(self):
+        self.test_file = "/tmp/test_hierarchical_chores.jsonl"
+        self.repo = ChoreRepository(self.test_file)
+        self.parent_chore = self.repo.create("Parent Chore", "Parent description")
+    
+    def tearDown(self):
+        if os.path.exists(self.test_file):
+            os.remove(self.test_file)
+    
+    def test_create_sub_chore(self):
+        """Test creating sub-chores."""
+        sub_chore = self.repo.create_sub_chore(self.parent_chore.id, "Sub Chore", "Sub description")
+        
+        self.assertIsNotNone(sub_chore)
+        self.assertEqual(sub_chore.parent_chore_id, self.parent_chore.id)
+        self.assertTrue(self.parent_chore.is_parent)
+    
+    def test_get_sub_chores(self):
+        """Test getting sub-chores."""
+        sub_chore1 = self.repo.create_sub_chore(self.parent_chore.id, "Sub 1", "Description 1")
+        sub_chore2 = self.repo.create_sub_chore(self.parent_chore.id, "Sub 2", "Description 2")
+        
+        sub_chores = self.repo.get_sub_chores(self.parent_chore.id)
+        
+        self.assertEqual(len(sub_chores), 2)
+        self.assertIn(sub_chore1, sub_chores)
+        self.assertIn(sub_chore2, sub_chores)
+    
+    def test_find_root_chores(self):
+        """Test finding root chores."""
+        sub_chore = self.repo.create_sub_chore(self.parent_chore.id, "Sub Chore", "Sub description")
+        root_chore = self.repo.create("Another Root", "Root description")
+        
+        root_chores = self.repo.find_root_chores()
+        
+        self.assertIn(self.parent_chore, root_chores)
+        self.assertIn(root_chore, root_chores)
+        self.assertNotIn(sub_chore, root_chores)
+
+
+class TestChoreDecomposer(unittest.TestCase):
+    """Test chore decomposition functionality."""
+    
+    def setUp(self):
+        self.test_file = "/tmp/test_decomposer_chores.jsonl"
+        self.repo = ChoreRepository(self.test_file)
+        self.decomposer = ChoreDecomposer(self.repo)
+        self.parent_chore = self.repo.create("Complex Chore", "Complex description")
+    
+    def tearDown(self):
+        if os.path.exists(self.test_file):
+            os.remove(self.test_file)
+    
+    def test_quality_criteria_validation(self):
+        """Test quality criteria validation."""
+        valid_plan = [{
+            'title': 'Valid Sub-chore',
+            'description': 'Clear description with semantic location in the handler method where validation occurs',
+            'scope_boundaries': 'Includes validation logic, excludes error handling',
+            'broader_context': 'Part of authentication system',
+            'success_criteria': 'Code compiles, tests pass, lints cleanly'
+        }]
+        
+        self.assertTrue(self.decomposer._validate_quality_criteria(valid_plan))
+    
+    def test_specificity_check(self):
+        """Test specificity validation."""
+        specific_sub_chore = {
+            'title': 'Update Authentication Handler',
+            'description': 'Modify the authentication handler in the user service where token validation occurs to support new JWT format'
+        }
+        
+        non_specific_sub_chore = {
+            'title': 'Fix Code',
+            'description': 'Update lines 45-67 in the first three methods'
+        }
+        
+        self.assertTrue(self.decomposer._check_specificity(specific_sub_chore))
+        self.assertFalse(self.decomposer._check_specificity(non_specific_sub_chore))
+
+
+class TestChoreReviewer(unittest.TestCase):
+    """Test chore review functionality."""
+    
+    def setUp(self):
+        self.test_file = "/tmp/test_reviewer_chores.jsonl"
+        self.repo = ChoreRepository(self.test_file)
+        self.reviewer = ChoreReviewer(self.repo)
+        self.parent_chore = self.repo.create("Parent Chore", "Parent description")
+    
+    def tearDown(self):
+        if os.path.exists(self.test_file):
+            os.remove(self.test_file)
+    
+    def test_review_good_decomposition(self):
+        """Test reviewing a good decomposition plan."""
+        good_plan = [{
+            'title': 'Implement User Authentication',
+            'description': 'Add authentication logic in the user service handler where login requests are processed, implementing JWT token generation and validation',
+            'scope_boundaries': 'Includes token generation and validation, excludes password hashing which is handled separately',
+            'broader_context': f'Part of parent chore {self.parent_chore.id} for user management system',
+            'success_criteria': 'Code compiles without errors, unit tests pass, integration tests verify token flow'
+        }]
+        
+        result = self.reviewer.review_decomposition(self.parent_chore, good_plan)
+        
+        self.assertEqual(result['overall_assessment'], 'APPROVED')
+        self.assertEqual(len(result['specific_issues']), 0)
+    
+    def test_review_poor_decomposition(self):
+        """Test reviewing a poor decomposition plan."""
+        poor_plan = [{
+            'title': 'Fix stuff',
+            'description': 'Update lines 1-50',
+            'scope_boundaries': '',
+            'success_criteria': 'It works'
+        }]
+        
+        result = self.reviewer.review_decomposition(self.parent_chore, poor_plan)
+        
+        self.assertEqual(result['overall_assessment'], 'NEEDS_REVISION')
+        self.assertGreater(len(result['specific_issues']), 0)
 
 
 if __name__ == '__main__':
